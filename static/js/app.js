@@ -129,7 +129,6 @@ async function generateRecs() {
                             <div class="movie-details">
                                 <div class="movie-title">${r.title}</div>
                                 <div>${genreTags(r.genres)}</div>
-                                <div class="rec-item-reason">${simplifyReason(r.reason)}</div>
                             </div>
                         </div>
                     `).join("")}
