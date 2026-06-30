@@ -311,6 +311,7 @@ class StreamingRecommender:
     # DP Mochila
     # ================================================================
     def dp_knapsack_recs(self, candidates, k=5, genre_limit=10):
+        genre_limit = max(genre_limit, k * 3)
         limited = candidates[:30]
         n = len(limited)
         if n == 0:
