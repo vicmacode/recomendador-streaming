@@ -9,6 +9,7 @@ function showPanel(name) {
     document.querySelector(`.nav button[data-panel="${name}"]`).classList.add("active");
 
     if (name === "bellman") loadBellmanMovies();
+    if (name === "recs" && $("rec-results").querySelector(".empty-state")) generateRecs();
 }
 
 // --- Modo técnico ---
@@ -40,14 +41,13 @@ async function onUserChange(uid) {
     currentUser = parseInt(uid);
     $("global-user-info").textContent = "Cargando...";
 
-    // Limpiar resultados anteriores
-    html("rec-results", `<div class="empty-state"><div class="empty-icon">🎯</div><div class="empty-text">Haz clic en <strong>"Recomendar películas"</strong> para generar sugerencias personalizadas</div></div>`);
-    html("flow-results", `<div class="empty-state"><div class="empty-icon">🔀</div><div class="empty-text">Haz clic en <strong>"Distribuir películas"</strong> para ver la asignación óptima</div></div>`);
-    html("bf-results", `<div class="empty-state"><div class="empty-icon">🗺️</div><div class="empty-text">Selecciona una película favorita y haz clic en <strong>"Buscar"</strong></div></div>`);
+    html("rec-results", `<div class="empty-state"><div class="empty-icon">🎬</div><div class="empty-text">Buscando películas para ti...</div></div>`);
+    html("flow-results", `<div class="empty-state"><div class="empty-icon">🍿</div><div class="empty-text">Haz clic en <strong>"Repartir películas"</strong> para ver qué le toca a cada uno</div></div>`);
+    html("bf-results", `<div class="empty-state"><div class="empty-icon">▶️</div><div class="empty-text">Elige una película que te haya gustado y haz clic en <strong>"Qué ver después"</strong></div></div>`);
 
     try {
         const info = await fetch(API + `/api/user/${currentUser}`).then(r => r.json());
-        $("global-user-info").textContent = `${info.total_ratings} películas · rating prom. ${info.avg_rating}`;
+        $("global-user-info").textContent = `${info.total_ratings} películas · ★ ${info.avg_rating}`;
         loadUserProfile(info);
     } catch {
         $("global-user-info").textContent = "Error al cargar";
@@ -71,7 +71,7 @@ async function init() {
             <div class="stat-card tech-detail"><div class="icon">🔗</div><div class="value">${formatNum(summary.aristas)}</div><div class="label">Aristas del grafo</div></div>
         `);
 
-        const opts = users.map(u => `<option value="${u}" ${u === 1 ? "selected" : ""}>Usuario ${u}</option>`).join("");
+        const opts = users.map(u => `<option value="${u.id}" ${u.id === 1 ? "selected" : ""}>${u.name}</option>`).join("");
         $("global-user-select").innerHTML = opts;
 
         onUserChange(1);
@@ -116,23 +116,44 @@ async function generateRecs() {
     try {
         const data = await fetch(API + `/api/recommend/${currentUser}?k=${k}`).then(r => r.json());
 
-        function recColumn(simpleName, techName, method, color, emoji) {
+        // Vista simple: lista limpia con resultados de Programación Dinámica
+        const simpleView = `
+            <div class="simple-rec-view">
+                <div class="rec-summary">
+                    Encontramos <strong>${data.dp.recs.length} películas</strong> pensadas para ti.
+                </div>
+                <div class="movie-list">
+                    ${data.dp.recs.map((r, i) => `
+                        <div class="movie-row">
+                            <span class="movie-rank">${i + 1}</span>
+                            <div class="movie-details">
+                                <div class="movie-title">${r.title}</div>
+                                <div>${genreTags(r.genres)}</div>
+                                <div class="rec-item-reason">${simplifyReason(r.reason)}</div>
+                            </div>
+                        </div>
+                    `).join("")}
+                </div>
+            </div>
+        `;
+
+        // Vista técnica: 3 columnas con comparación de algoritmos
+        function recColumn(algoName, method, color, emoji) {
             const d = data[method];
             const maxScore = Math.max(...d.recs.map(r => r.score), 1);
             return `
                 <div class="rec-column" style="border-top: 3px solid ${color}">
-                    <h3>${emoji} ${simpleName}</h3>
-                    <div class="tech-detail" style="margin-bottom:12px">${techName} | ${d.time}s | Score: ${d.total_score}</div>
-                    <div class="meta">${d.recs.length} películas seleccionadas</div>
+                    <h3>${emoji} ${algoName}</h3>
+                    <div style="font-size:0.75rem;color:var(--text-secondary);margin-bottom:8px">${d.time}s | Score total: ${d.total_score}</div>
+                    <div class="meta">${d.recs.length} películas</div>
                     ${d.recs.map((r, i) => `
                         <div class="rec-item">
                             <div class="rec-item-header">
                                 <div class="rank" style="background:${color}20;color:${color}">#${i + 1}</div>
                                 <div class="title">${r.title}</div>
                             </div>
-                            <div class="rec-item-reason">${simplifyReason(r.reason)}</div>
                             <div class="info">${genreTags(r.genres)}</div>
-                            <div class="info tech-detail">Score: ${r.score} | ${r.reason}</div>
+                            <div style="font-size:0.75rem;color:var(--text-secondary);margin-top:4px">Score: ${r.score}</div>
                             <div class="score-bar"><div class="fill" style="width:${(r.score / maxScore * 100)}%;background:${color}"></div></div>
                         </div>
                     `).join("")}
@@ -140,31 +161,35 @@ async function generateRecs() {
             `;
         }
 
-        html("rec-results", `
-            <div class="rec-summary">
-                Se analizaron <strong>${formatNum(data.total_candidates)}</strong> películas para encontrar las mejores opciones.
-                <span class="tech-detail">Scoring: ${data.scoring_time}s (Fuerza Bruta + BFS + Merge Sort)</span>
+        const techView = `
+            <div class="tech-view">
+                <div class="rec-summary">
+                    Se analizaron <strong>${formatNum(data.total_candidates)}</strong> candidatos en ${data.scoring_time}s
+                    (Fuerza Bruta + BFS + Merge Sort)
+                </div>
+                <div class="grid-3">
+                    ${recColumn("Backtracking", "backtracking", "#4f9cf7", "🔄")}
+                    ${recColumn("Greedy (Voraz)", "greedy", "#f59e0b", "⚡")}
+                    ${recColumn("Programación Dinámica", "dp", "#34d399", "📦")}
+                </div>
+                <div class="section" style="margin-top:20px">
+                    <h3>👥 Usuarios con gustos parecidos</h3>
+                    <p style="font-size:0.78rem;color:var(--text-secondary);margin-bottom:12px">Fuerza Bruta (similitud coseno) + Merge Sort</p>
+                    <table class="data-table">
+                        <thead><tr><th>Usuario</th><th>Compatibilidad</th><th>Similitud coseno</th></tr></thead>
+                        <tbody>${data.similar_users.map(u => `
+                            <tr>
+                                <td>Usuario ${u.user_id}</td>
+                                <td><div class="compat-bar"><div class="compat-fill" style="width:${u.similarity * 100}%"></div><span>${(u.similarity * 100).toFixed(1)}%</span></div></td>
+                                <td>${u.similarity}</td>
+                            </tr>
+                        `).join("")}</tbody>
+                    </table>
+                </div>
             </div>
-            <div class="grid-3">
-                ${recColumn("Búsqueda precisa", "Backtracking O(2²⁰)", "backtracking", "#4f9cf7", "🔄")}
-                ${recColumn("Búsqueda rápida", "Greedy O(n×g)", "greedy", "#f59e0b", "⚡")}
-                ${recColumn("Búsqueda equilibrada", "DP Mochila 0/1 O(n×W)", "dp", "#34d399", "📦")}
-            </div>
-            <div class="section" style="margin-top:20px">
-                <h3>👥 Usuarios con gustos parecidos</h3>
-                <div class="tech-detail">Fuerza Bruta (similitud coseno) + Merge Sort (ordenamiento)</div>
-                <table class="data-table">
-                    <thead><tr><th>Usuario</th><th>Compatibilidad</th><th class="tech-detail">Similitud coseno</th></tr></thead>
-                    <tbody>${data.similar_users.map(u => `
-                        <tr>
-                            <td>Usuario ${u.user_id}</td>
-                            <td><div class="compat-bar"><div class="compat-fill" style="width:${u.similarity * 100}%"></div><span>${(u.similarity * 100).toFixed(1)}%</span></div></td>
-                            <td class="tech-detail">${u.similarity}</td>
-                        </tr>
-                    `).join("")}</tbody>
-                </table>
-            </div>
-        `);
+        `;
+
+        html("rec-results", simpleView + techView);
         toggleTech();
     } catch {
         errMsg("rec-results");
@@ -176,8 +201,8 @@ async function generateRecs() {
 function simplifyReason(reason) {
     if (!reason) return "";
     return reason
-        .replace(/cerca en grafo \(\d+ conex\.\)/g, "Popular entre usuarios similares")
-        .replace(/usuario \d+ \(sim:[\d.]+\)/g, "Gustó a alguien con gustos parecidos")
+        .replace(/cerca en grafo \(\d+ conex\.\)/g, "Popular entre personas similares a ti")
+        .replace(/usuario \d+ \(sim:[\d.]+\)/g, "Le gustó a alguien con tus mismos gustos")
         .replace(/; /g, " · ");
 }
 
@@ -200,7 +225,7 @@ async function runUFDS() {
                 <div class="community-item">
                     <div class="comm-header">
                         <span class="comm-badge" style="background:var(--accent-purple)">${c.size}</span>
-                        <span>Grupo ${i + 1} — ${c.size} usuarios con gustos similares</span>
+                        <span>Grupo ${i + 1} — ${c.size} personas con gustos similares</span>
                     </div>
                     <div class="members">Usuarios: ${c.members.join(", ")}${c.size > 15 ? "..." : ""}</div>
                 </div>
@@ -223,16 +248,16 @@ async function runSCC() {
         const data = await fetch(API + "/api/scc").then(r => r.json());
         html("scc-results", `
             <div class="stats-row">
-                <div class="stat-card"><div class="value">${data.total_communities}</div><div class="label">Comunidades</div></div>
+                <div class="stat-card"><div class="value">${data.total_communities}</div><div class="label">Círculos encontrados</div></div>
                 <div class="stat-card tech-detail"><div class="value">${data.time}s</div><div class="label">Tiempo Kosaraju</div></div>
             </div>
             ${data.communities.length === 0
-                ? '<div class="empty-state-sm">No se encontraron comunidades con los parámetros actuales.</div>'
+                ? '<div class="empty-state-sm">No se encontraron círculos con los parámetros actuales.</div>'
                 : data.communities.map((c, i) => `
                     <div class="community-item">
                         <div class="comm-header">
                             <span class="comm-badge" style="background:var(--accent-orange)">${c.size}</span>
-                            <span>Comunidad ${i + 1} — ${c.size} usuarios que se influyen entre sí</span>
+                            <span>Círculo ${i + 1} — ${c.size} personas que se influyen entre sí</span>
                         </div>
                         <div class="members">Miembros: ${c.members.join(", ")}${c.size > 15 ? "..." : ""}</div>
                     </div>
@@ -260,7 +285,7 @@ async function runMST() {
                 <div class="stat-card tech-detail"><div class="value">${data.total_weight}</div><div class="label">Costo total MST</div></div>
                 <div class="stat-card tech-detail"><div class="value">${data.time}s</div><div class="label">Tiempo Kruskal</div></div>
             </div>
-            <h3>Parejas de usuarios más compatibles</h3>
+            <h3>Parejas más compatibles</h3>
             ${data.top_edges.map(e => `
                 <div class="mst-edge">
                     <span class="edge-label">Usuario ${e.u1} — Usuario ${e.u2}</span>
@@ -286,14 +311,14 @@ async function runFlow() {
         const data = await fetch(API + `/api/flow/${currentUser}`).then(r => r.json());
         html("flow-results", `
             <div class="stats-row">
-                <div class="stat-card"><div class="icon">🎬</div><div class="value">${data.max_flow}</div><div class="label">Películas distribuidas</div></div>
+                <div class="stat-card"><div class="icon">🎬</div><div class="value">${data.max_flow}</div><div class="label">Películas repartidas</div></div>
                 <div class="stat-card tech-detail"><div class="value">${data.time}s</div><div class="label">Tiempo Ford-Fulkerson</div></div>
             </div>
-            <h3>Películas asignadas a cada usuario</h3>
-            ${Object.entries(data.assignments).map(([uid, movies]) => `
+            <h3>¿Qué le toca ver a cada uno?</h3>
+            ${Object.entries(data.assignments).map(([uid, asn]) => `
                 <div class="flow-user">
-                    <div class="user-label">👤 Usuario ${uid}</div>
-                    ${movies.map(m => `
+                    <div class="user-label">👤 ${asn.name}</div>
+                    ${asn.movies.map(m => `
                         <div class="movie-item">🎬 ${m.title}</div>
                     `).join("")}
                 </div>
@@ -330,7 +355,7 @@ async function runBellman() {
         const data = await fetch(API + `/api/bellman/${currentUser}/${mid}`).then(r => r.json());
         html("bf-results", `
             <div class="bf-start">
-                Partiendo de: <strong>${data.start_movie}</strong>
+                Porque te gustó: <strong>${data.start_movie}</strong>
                 <span class="tech-detail"> | Bellman-Ford: ${data.time}s</span>
             </div>
             ${data.path.length === 0

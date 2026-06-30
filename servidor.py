@@ -20,6 +20,19 @@ sys.setrecursionlimit(15000)
 
 from flask import Flask, jsonify, render_template, request
 
+NOMBRES = ["Ana","Carlos","María","Juan","Valentina","Sebastián","Camila","Diego",
+           "Sofía","Alejandro","Isabella","Mateo","Lucía","Andrés","Daniela",
+           "Felipe","Paula","Javier","Natalia","Miguel","Laura","Gabriel",
+           "Adriana","Rodrigo","Fernanda"]
+APELLIDOS = ["García","López","Martínez","Rodríguez","González","Fernández",
+             "Pérez","Sánchez","Ramírez","Torres","Flores","Rivera","Morales",
+             "Ortiz","Cruz","Reyes","Gutiérrez","Herrera","Mendoza","Vargas",
+             "Castro","Ríos","Moreno","Jiménez","Ruiz"]
+
+def get_user_name(uid: int) -> str:
+    i = uid - 1
+    return f"{NOMBRES[i % len(NOMBRES)]} {APELLIDOS[(i // len(NOMBRES)) % len(APELLIDOS)]}"
+
 # ============================================================
 # Datos
 # ============================================================
@@ -127,6 +140,7 @@ class StreamingRecommender:
         top = sorted(rats.items(), key=lambda x: -x[1])[:10]
         return {
             "user_id": uid,
+            "name": get_user_name(uid),
             "total_ratings": len(rats),
             "avg_rating": round(sum(rats.values()) / len(rats), 2),
             "top_movies": [
@@ -692,7 +706,7 @@ def api_summary():
 @app.route("/api/users")
 def api_users():
     users = sorted(rec.user_ratings.keys())
-    return jsonify(users)
+    return jsonify([{"id": u, "name": get_user_name(u)} for u in users])
 
 
 @app.route("/api/user/<int:uid>")
@@ -806,7 +820,10 @@ def api_flow(uid):
     elapsed = time.time() - t0
     result = {}
     for u, mids in assign.items():
-        result[str(u)] = [{"movie_id": m, "title": rec.movies[m].title} for m in mids if m in rec.movies]
+        result[str(u)] = {
+            "name": get_user_name(u),
+            "movies": [{"movie_id": m, "title": rec.movies[m].title} for m in mids if m in rec.movies]
+        }
     return jsonify({"time": round(elapsed, 3), "max_flow": flow, "assignments": result})
 
 

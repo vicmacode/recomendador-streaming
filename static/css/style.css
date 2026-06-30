@@ -755,6 +755,11 @@ body.tech-mode .tech-detail { display: block; animation: fadeIn 0.3s; }
     .footer-content span::after { display: none; }
 }
 
+/* Vistas simple/técnica en recomendaciones */
+.tech-view { display: none; }
+body.tech-mode .tech-view { display: block; }
+body.tech-mode .simple-rec-view { display: none; }
+
 /* Stat cards en modo técnico: mantener apariencia de tarjeta, no de caja técnica */
 body.tech-mode .stat-card.tech-detail {
     background: var(--bg-card);
