@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recomendador de Streaming</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+    <h1>🎬 Recomendador de Contenido</h1>
+    <div class="header-right">
+        <div class="global-user">
+            <span class="global-user-label">👤</span>
+            <select id="global-user-select" onchange="onUserChange(this.value)"></select>
+            <span id="global-user-info" class="global-user-meta"></span>
+        </div>
+        <label class="toggle-tech">
+            <input type="checkbox" id="tech-toggle" onchange="toggleTech()">
+            <span class="toggle-slider"></span>
+            <span class="toggle-label">🔬 Técnico</span>
+        </label>
+    </div>
+</div>
+
+<!-- Navigation -->
+<div class="nav">
+    <button class="active" data-panel="dataset" onclick="showPanel('dataset')">📊 Inicio</button>
+    <button data-panel="recs" onclick="showPanel('recs')">🎯 Recomendaciones</button>
+    <button data-panel="communities" onclick="showPanel('communities')">👥 Grupos</button>
+    <button data-panel="flow" onclick="showPanel('flow')">🔀 Distribución</button>
+    <button data-panel="bellman" onclick="showPanel('bellman')">🗺️ Qué ver después</button>
+</div>
+
+<div class="main">
+
+    <!-- ==================== INICIO ==================== -->
+    <div id="panel-dataset" class="panel active">
+        <div class="section">
+            <h2>📊 La plataforma en números</h2>
+            <p class="desc">Selecciona un usuario arriba y explora las recomendaciones generadas por diferentes estrategias.</p>
+            <p class="tech-detail">Dataset: MovieLens Latest Small. Grafo bipartito G=(V,E) donde V = usuarios ∪ películas, E = calificaciones. Lista de adyacencia.</p>
+            <div id="stats" class="stats-row">
+                <div class="loading"><span class="spinner"></span> Cargando...</div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>👤 Perfil del usuario seleccionado</h2>
+            <p class="desc">Películas mejor calificadas por este usuario.</p>
+            <p class="tech-detail">Exploración por fuerza bruta del diccionario de ratings del usuario. DFS para componentes conectados del grafo.</p>
+            <div id="user-info">
+                <div class="empty-state">Cargando perfil del usuario...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== RECOMENDACIONES ==================== -->
+    <div id="panel-recs" class="panel">
+        <div class="section">
+            <h2>🎯 Películas recomendadas</h2>
+            <p class="desc">
+                Comparamos <strong>3 estrategias</strong> para encontrar las mejores películas:
+                la más precisa, la más rápida y la más equilibrada.
+            </p>
+            <p class="tech-detail">
+                <strong>Algoritmos:</strong> Fuerza Bruta (similitud coseno O(U×P)), BFS (candidatos O(V+E)), Merge Sort (ordenamiento O(n log n)).
+                <br>Selección: Backtracking O(2²⁰), Greedy O(n×g), DP Mochila 0/1 O(n×W).
+            </p>
+            <div class="user-selector">
+                <label style="color:var(--text-secondary);font-size:0.85rem">Cantidad de recomendaciones:</label>
+                <input id="rec-k" type="number" value="5" min="3" max="10" style="width:70px">
+                <button class="btn" onclick="generateRecs()">🚀 Recomendar películas</button>
+            </div>
+        </div>
+        <div id="rec-results">
+            <div class="empty-state">
+                <div class="empty-icon">🎯</div>
+                <div class="empty-text">Haz clic en <strong>"Recomendar películas"</strong> para generar sugerencias personalizadas</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== COMUNIDADES ==================== -->
+    <div id="panel-communities" class="panel">
+        <div class="grid-2">
+            <div class="section">
+                <h2>🔗 Agrupación de usuarios</h2>
+                <p class="desc">
+                    Encuentra grupos de usuarios con gustos muy parecidos. Si dos personas califican las mismas películas de forma similar, quedan en el mismo grupo.
+                </p>
+                <p class="tech-detail">
+                    <strong>UFDS (Quick-Union Ponderado)</strong>. Umbral: similitud coseno ≥ 0.99, mínimo 20 películas en común. Complejidad: O(α(n)) por operación.
+                </p>
+                <button class="btn purple" onclick="runUFDS()">Buscar grupos</button>
+                <div id="ufds-results" style="margin-top:16px">
+                    <div class="empty-state-sm">Haz clic para analizar</div>
+                </div>
+            </div>
+            <div class="section">
+                <h2>🌐 Comunidades de influencia</h2>
+                <p class="desc">
+                    Detecta comunidades donde los usuarios se influyen mutuamente: si a ti te gusta lo que le gusta a otro, y viceversa, forman una comunidad.
+                </p>
+                <p class="tech-detail">
+                    <strong>SCC — Algoritmo de Kosaraju</strong>. Grafo dirigido de influencia + DFS en grafo transpuesto. Complejidad: O(V + E).
+                </p>
+                <button class="btn orange" onclick="runSCC()">Detectar comunidades</button>
+                <div id="scc-results" style="margin-top:16px">
+                    <div class="empty-state-sm">Haz clic para analizar</div>
+                </div>
+            </div>
+        </div>
+        <div class="section">
+            <h2>🌳 Red mínima de conexiones</h2>
+            <p class="desc">
+                Conecta a todos los usuarios similares usando la menor cantidad de enlaces posible, como un mapa de relaciones simplificado.
+            </p>
+            <p class="tech-detail">
+                <strong>MST — Algoritmo de Kruskal</strong>. Peso = (1 - similitud coseno). Usa UFDS para detección de ciclos. Complejidad: O(E log E).
+            </p>
+            <button class="btn" onclick="runMST()">Construir red</button>
+            <div id="mst-results" style="margin-top:16px">
+                <div class="empty-state-sm">Haz clic para analizar</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== FLUJO MAXIMO ==================== -->
+    <div id="panel-flow" class="panel">
+        <div class="section">
+            <h2>🔀 ¿Cómo repartir películas entre usuarios?</h2>
+            <p class="desc">
+                Imagina que solo puedes recomendar un número limitado de películas. ¿Cómo las repartes entre varios usuarios
+                para que todos reciban algo que les guste? Este módulo encuentra la distribución óptima.
+            </p>
+            <p class="tech-detail">
+                <strong>Flujo Máximo — Ford-Fulkerson (Edmonds-Karp)</strong>. Red: Fuente → Usuarios → Películas → Sumidero. BFS para caminos aumentantes. Complejidad: O(V × E²).
+            </p>
+            <button class="btn green" onclick="runFlow()">Distribuir películas</button>
+        </div>
+        <div id="flow-results">
+            <div class="empty-state">
+                <div class="empty-icon">🔀</div>
+                <div class="empty-text">Haz clic en <strong>"Distribuir películas"</strong> para ver la asignación óptima</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== BELLMAN-FORD ==================== -->
+    <div id="panel-bellman" class="panel">
+        <div class="section">
+            <h2>🗺️ ¿Qué ver después?</h2>
+            <p class="desc">
+                Elige una película que te haya encantado y te mostramos las películas más parecidas que aún no has visto.
+            </p>
+            <p class="tech-detail">
+                <strong>Bellman-Ford</strong>. Peso entre películas = diferencia promedio de rating entre usuarios comunes. Relaja aristas V-1 veces. Complejidad: O(V × E).
+            </p>
+            <div class="user-selector">
+                <label style="color:var(--text-secondary);font-size:0.85rem">Película de partida:</label>
+                <select id="bf-movie-select" style="min-width:320px">
+                    <option>Cargando películas...</option>
+                </select>
+                <button class="btn green" onclick="runBellman()">Buscar películas similares</button>
+            </div>
+        </div>
+        <div id="bf-results">
+            <div class="empty-state">
+                <div class="empty-icon">🗺️</div>
+                <div class="empty-text">Selecciona una película favorita y haz clic en <strong>"Buscar"</strong></div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<footer class="footer">
+    <div class="footer-content">
+        <span>1ACC0184 — Complejidad Algorítmica — UPC 2026-10</span>
+        <span>Centeno León · Martínez Concepcion · García Paredes</span>
+    </div>
+</footer>
+
+<script src="/static/js/app.js"></script>
+
+</body>
+</html>

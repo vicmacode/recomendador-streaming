@@ -1,0 +1,15 @@
+# Dataset - se descarga automaticamente al iniciar
+ml-latest-small/
+ml-latest-small.zip
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Logs
+servidor_log.txt
+
+# Entornos virtuales
+venv/
+env/
