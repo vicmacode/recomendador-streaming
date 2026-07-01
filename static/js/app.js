@@ -41,6 +41,7 @@ async function onUserChange(uid) {
     currentUser = parseInt(uid);
     $("global-user-info").textContent = "Cargando...";
 
+    const onRecsPanel = document.getElementById("panel-recs").classList.contains("active");
     html("rec-results", `<div class="empty-state"><div class="empty-icon">🎬</div><div class="empty-text">Buscando películas para ti...</div></div>`);
     html("flow-results", `<div class="empty-state"><div class="empty-icon">🍿</div><div class="empty-text">Haz clic en <strong>"Repartir películas"</strong> para ver qué le toca a cada uno</div></div>`);
     html("bf-results", `<div class="empty-state"><div class="empty-icon">▶️</div><div class="empty-text">Elige una película que te haya gustado y haz clic en <strong>"Qué ver después"</strong></div></div>`);
@@ -53,6 +54,7 @@ async function onUserChange(uid) {
         $("global-user-info").textContent = "Error al cargar";
     }
     loadBellmanMovies();
+    if (onRecsPanel) generateRecs();
 }
 
 // --- Init ---
